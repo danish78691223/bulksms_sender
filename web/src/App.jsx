@@ -43,7 +43,7 @@ function readCsv(text) {
   const nameHeaders = ['name', 'fullname', 'contactname', 'displayname', 'firstname'];
   const phoneHeaders = ['phone', 'phonenumber', 'mobile', 'mobilenumber', 'number', 'telephone', 'telephonenumber', 'contactnumber', 'whatsappnumber', 'mobileno', 'phoneno', 'cellphone'];
   const nameIndexFound = headers.findIndex(h => nameHeaders.includes(h));
-  const phoneIndexFound = headers.findIndex(h => phoneHeaders.includes(h));
+  const phoneIndexFound = headers.findIndex(h => phoneHeaders.includes(h) || /^(phone|mobile|telephone|cellphone)\\d*(value|number)?$/.test(h) || /^(whatsapp|contact)number$/.test(h));
   const hasHeader = nameIndexFound >= 0 || phoneIndexFound >= 0;
   const data = hasHeader ? rows.slice(1) : rows;
   const nameIndex = hasHeader ? nameIndexFound : 0;
