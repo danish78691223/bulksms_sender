@@ -15,7 +15,7 @@ router.get('/', async (req, res, next) => {
     res.json({ contacts, count: contacts.length });
   } catch (e) { next(e); }
 });
-function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); }
+function escapeRegex(s) { const slash = String.fromCharCode(92); return Array.from(s, ch => '^$.*+?()[]{}|'.includes(ch) || ch === slash ? slash + ch : ch).join(''); }
 
 router.post('/import', async (req, res, next) => {
   try {
