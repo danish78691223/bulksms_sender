@@ -61,7 +61,7 @@ export default function App() {
     try {
       const rows = readCsv(await csvFile.text());
       const result = await api('/api/contacts/import', { method: 'POST', body: JSON.stringify({ source: 'csv', contacts: rows }) });
-      setNotice(`${result.imported} contacts imported/updated; ${result.skipped} skipped. Imported contacts remain consent-unknown.`);
+      setNotice(`${result.imported} contacts imported/updated; ${result.skipped} skipped (${result.invalidPhone ?? result.skipped} invalid phone numbers). Imported contacts remain consent-unknown.`);
       await refresh();
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
