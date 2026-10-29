@@ -16,7 +16,7 @@ function readCsv(text) {
   const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim());
   if (!lines.length) return [];
 
-  // Support ordinary CSV, semicolon-separated exports, and tab-delimited exports.
+  // Detect common CSV, semicolon and tab delimiters using the first non-empty line.
   const firstLine = lines[0];
   const delimiter = [',', ';', '\t'].map(d => ({
     delimiter: d,
@@ -40,20 +40,32 @@ function readCsv(text) {
   const rows = lines.map(parseLine);
   const normalizeHeader = value => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const headers = rows[0].map(normalizeHeader);
-  const nameHeaders = ['name', 'fullname', 'contactname', 'displayname', 'firstname'];
-  const phoneHeaders = ['phone', 'phonenumber', 'mobile', 'mobilenumber', 'number', 'telephone', 'telephonenumber', 'contactnumber', 'whatsappnumber', 'mobileno', 'phoneno', 'cellphone'];
+  const nameHeaders = ['name', 'fullname', 'contactname', 'displayname', 'firstname', 'firstandlastname'];
+  const phoneHeaders = ['phone', 'phonenumber', 'mobile', 'mobilenumber', 'number', 'telephone', 'telephonenumber', 'contactnumber', 'whatsappnumber', 'mobileno', 'phoneno', 'cellphone', 'phone1value', 'phone2value', 'mobile1value'];
   const nameIndexFound = headers.findIndex(h => nameHeaders.includes(h));
-  const phoneIndexFound = headers.findIndex(h => phoneHeaders.includes(h) || /^(phone|mobile|telephone|cellphone)\\d*(value|number)?$/.test(h) || /^(whatsapp|contact)number$/.test(h));
-  const hasHeader = nameIndexFound >= 0 || phoneIndexFound >= 0;
-  const data = hasHeader ? rows.slice(1) : rows;
-  const nameIndex = hasHeader ? nameIndexFound : 0;
-  const phoneIndex = hasHeader ? phoneIndexFound : 1;
+  const phoneIndexFound = headers.findIndex(h =>
+    phoneHeaders.includes(h) ||
+    /^(phone|mobile|telephone|cellphone)\d*(value|number|no)?$/.test(h) ||
+    /^(whatsapp|contact)number$/.test(h)
+  );
+  const hasRecognizedHeader = nameIndexFound >= 0 || phoneIndexFound >= 0;
+  const data = hasRecognizedHeader ? rows.slice(1) : rows;
 
-  // Do not accidentally interpret a name column as a phone column.
-  if (hasHeader && phoneIndex < 0) return [];
+  let nameIndex = hasRecognizedHeader ? nameIndexFound : 0;
+  let phoneIndex = hasRecognizedHeader ? phoneIndexFound : -1;
+
+  // Headerless files may contain only phone numbers, or name and phone in two columns.
+  if (!hasRecognizedHeader) {
+    const maxColumns = Math.max(...data.map(row => row.length));
+    if (maxColumns <= 1) { nameIndex = -1; phoneIndex = 0; }
+    else { nameIndex = 0; phoneIndex = 1; }
+  }
+
+  // If headers exist but no phone column is recognized, return no rows instead of importing names as numbers.
+  if (hasRecognizedHeader && phoneIndex < 0) return [];
   return data.map(row => ({
     name: nameIndex >= 0 ? (row[nameIndex] || '') : '',
-    phone: row[phoneIndex >= 0 ? phoneIndex : 1] || ''
+    phone: row[phoneIndex] || ''
   })).filter(c => c.phone);
 }
 
