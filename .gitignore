@@ -1,0 +1,11 @@
+# Dependencies installed by deployment/build systems
+node_modules/
+**/node_modules/
+dist/
+build/
+coverage/
+.expo/
+.env
+.env.*
+!.env.example
+.DS_Store
