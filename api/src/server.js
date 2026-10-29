@@ -11,7 +11,26 @@ import webhookRoutes from './routes/webhooks.js';
 
 const app = express();
 app.disable('x-powered-by');
-app.use(cors({ origin: (process.env.CORS_ORIGIN || 'http://localhost:5173').split(',').map(x => x.trim()) }));
+
+// Keep the deployed frontend allowed even if CORS_ORIGIN has not yet been
+// updated in Render. CORS_ORIGIN can contain comma-separated extra domains.
+const allowedOrigins = [
+  'https://bulksms-sender-phi.vercel.app',
+  'http://localhost:5173',
+  ...(process.env.CORS_ORIGIN || '').split(',').map(origin => origin.trim()).filter(Boolean),
+];
+const corsOptions = {
+  origin(origin, callback) {
+    // Requests without an Origin header (health checks/server-to-server) are allowed.
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`CORS origin not allowed: ${origin}`));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json({ limit: '1mb' }));
 app.use('/api/', rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: true, legacyHeaders: false }));
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'webxwhale-bulk-sms-api' }));
