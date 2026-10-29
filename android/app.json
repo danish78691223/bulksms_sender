@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "WEBXWHALE Contact Sync",
+    "slug": "webxwhale-contact-sync",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "android": {
+      "package": "com.webxwhale.contactsync",
+      "permissions": ["READ_CONTACTS"]
+    },
+    "plugins": ["expo-contacts"]
+  }
+}
