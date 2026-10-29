@@ -19,18 +19,29 @@ function escapeRegex(s) { const slash = String.fromCharCode(92); return Array.fr
 
 router.post('/import', async (req, res, next) => {
   try {
-    // Validate each phone individually so one malformed CSV number cannot reject the whole import.
-    const input = z.object({
+    // Validate the batch envelope first, then validate each row independently.
+    // A single malformed phone field must never reject every otherwise-valid contact.
+    const batch = z.object({
       source: z.enum(['google', 'android', 'csv', 'manual']),
-      contacts: z.array(z.object({
-        name: z.string().trim().max(120).optional(),
-        phone: z.string().trim().max(30).optional().default(''),
-        sourceContactId: z.string().max(200).optional()
-      })).max(2000)
+      contacts: z.array(z.unknown()).max(2000)
     }).parse(req.body);
 
+    const contactSchema = z.object({
+      name: z.string().trim().max(120).optional(),
+      // Allow malformed exports to reach row-level validation/normalization instead of failing the entire batch.
+      phone: z.string().trim().max(500).optional().default(''),
+      sourceContactId: z.string().max(200).optional()
+    });
+
     let imported = 0, skipped = 0, invalidPhone = 0;
-    for (const c of input.contacts) {
+    for (const rawContact of batch.contacts) {
+      const parsed = contactSchema.safeParse(rawContact);
+      if (!parsed.success) {
+        skipped++;
+        invalidPhone++;
+        continue;
+      }
+      const c = parsed.data;
       let normalizedPhone;
       try {
         normalizedPhone = normalizePhone(c.phone);
@@ -42,7 +53,7 @@ router.post('/import', async (req, res, next) => {
       await Contact.updateOne(
         { ownerId: req.user.id, normalizedPhone },
         {
-          $set: { name: c.name || '', phone: c.phone, source: input.source, sourceContactId: c.sourceContactId || '' },
+          $set: { name: c.name || '', phone: c.phone, source: batch.source, sourceContactId: c.sourceContactId || '' },
           $setOnInsert: { ownerId: req.user.id, consentStatus: 'unknown' }
         },
         { upsert: true }
