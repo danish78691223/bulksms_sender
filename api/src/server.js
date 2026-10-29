@@ -11,6 +11,8 @@ import webhookRoutes from './routes/webhooks.js';
 
 const app = express();
 app.disable('x-powered-by');
+// Render runs behind a trusted reverse proxy; enable proxy-aware client IP handling for rate limiting.
+app.set('trust proxy', 1);
 
 // Keep the deployed frontend allowed even if CORS_ORIGIN has not yet been
 // updated in Render. CORS_ORIGIN can contain comma-separated extra domains.
