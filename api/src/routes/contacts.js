@@ -15,24 +15,46 @@ router.get('/', async (req, res, next) => {
     res.json({ contacts, count: contacts.length });
   } catch (e) { next(e); }
 });
-function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'); }
 
 router.post('/import', async (req, res, next) => {
   try {
-    const input = z.object({ source: z.enum(['google', 'android', 'csv', 'manual']), contacts: z.array(z.object({ name: z.string().max(120).optional(), phone: z.string().min(7).max(30), sourceContactId: z.string().max(200).optional() })).max(2000) }).parse(req.body);
-    let imported = 0, skipped = 0;
+    // Validate each phone individually so one malformed CSV number cannot reject the whole import.
+    const input = z.object({
+      source: z.enum(['google', 'android', 'csv', 'manual']),
+      contacts: z.array(z.object({
+        name: z.string().trim().max(120).optional(),
+        phone: z.string().trim().max(30).optional().default(''),
+        sourceContactId: z.string().max(200).optional()
+      })).max(2000)
+    }).parse(req.body);
+
+    let imported = 0, skipped = 0, invalidPhone = 0;
     for (const c of input.contacts) {
+      let normalizedPhone;
       try {
-        const normalizedPhone = normalizePhone(c.phone);
-        await Contact.updateOne(
-          { ownerId: req.user.id, normalizedPhone },
-          { $set: { name: c.name || '', phone: c.phone, source: input.source, sourceContactId: c.sourceContactId || '' }, $setOnInsert: { ownerId: req.user.id, consentStatus: 'unknown' } },
-          { upsert: true }
-        );
-        imported++;
-      } catch { skipped++; }
+        normalizedPhone = normalizePhone(c.phone);
+      } catch {
+        skipped++;
+        invalidPhone++;
+        continue;
+      }
+      await Contact.updateOne(
+        { ownerId: req.user.id, normalizedPhone },
+        {
+          $set: { name: c.name || '', phone: c.phone, source: input.source, sourceContactId: c.sourceContactId || '' },
+          $setOnInsert: { ownerId: req.user.id, consentStatus: 'unknown' }
+        },
+        { upsert: true }
+      );
+      imported++;
     }
-    res.json({ imported, skipped, note: 'Imported contacts default to unknown consent; import does not authorize promotional messaging.' });
+    res.json({
+      imported,
+      skipped,
+      invalidPhone,
+      note: 'Imported contacts default to unknown consent; import does not authorize promotional messaging.'
+    });
   } catch (e) { next(e); }
 });
 router.post('/:id/consent', async (req, res, next) => {
