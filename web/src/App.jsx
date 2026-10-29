@@ -13,15 +13,50 @@ const api = async (path, options = {}) => {
   return data;
 };
 function readCsv(text) {
-  const rows = text.split(/\r?\n/).filter(Boolean).map(line => line.split(',').map(s => s.trim().replace(/^"|"$/g, '')));
-  if (!rows.length) return [];
-  const first = rows[0].map(s => s.toLowerCase());
-  const hasHeader = first.some(s => ['name','phone','mobile','number','telephone'].includes(s));
+  const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim());
+  if (!lines.length) return [];
+
+  // Support ordinary CSV, semicolon-separated exports, and tab-delimited exports.
+  const firstLine = lines[0];
+  const delimiter = [',', ';', '\t'].map(d => ({
+    delimiter: d,
+    count: [...firstLine].filter(ch => ch === d).length
+  })).sort((a, b) => b.count - a.count)[0].delimiter;
+
+  const parseLine = (line) => {
+    const cells = [];
+    let value = '', quoted = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"' && quoted && line[i + 1] === '"') { value += '"'; i++; }
+      else if (ch === '"') quoted = !quoted;
+      else if (ch === delimiter && !quoted) { cells.push(value.trim()); value = ''; }
+      else value += ch;
+    }
+    cells.push(value.trim());
+    return cells;
+  };
+
+  const rows = lines.map(parseLine);
+  const normalizeHeader = value => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const headers = rows[0].map(normalizeHeader);
+  const nameHeaders = ['name', 'fullname', 'contactname', 'displayname', 'firstname'];
+  const phoneHeaders = ['phone', 'phonenumber', 'mobile', 'mobilenumber', 'number', 'telephone', 'telephonenumber', 'contactnumber', 'whatsappnumber', 'mobileno', 'phoneno', 'cellphone'];
+  const nameIndexFound = headers.findIndex(h => nameHeaders.includes(h));
+  const phoneIndexFound = headers.findIndex(h => phoneHeaders.includes(h));
+  const hasHeader = nameIndexFound >= 0 || phoneIndexFound >= 0;
   const data = hasHeader ? rows.slice(1) : rows;
-  const nameIndex = hasHeader ? Math.max(0, first.findIndex(s => s === 'name')) : 0;
-  const phoneIndex = hasHeader ? first.findIndex(s => ['phone','mobile','number','telephone'].includes(s)) : 1;
-  return data.map(row => ({ name: row[nameIndex] || '', phone: row[phoneIndex >= 0 ? phoneIndex : 0] || '' })).filter(c => c.phone);
+  const nameIndex = hasHeader ? nameIndexFound : 0;
+  const phoneIndex = hasHeader ? phoneIndexFound : 1;
+
+  // Do not accidentally interpret a name column as a phone column.
+  if (hasHeader && phoneIndex < 0) return [];
+  return data.map(row => ({
+    name: nameIndex >= 0 ? (row[nameIndex] || '') : '',
+    phone: row[phoneIndex >= 0 ? phoneIndex : 1] || ''
+  })).filter(c => c.phone);
 }
+
 export default function App() {
   const [token, setToken] = useState(getToken());
   const [email, setEmail] = useState('');
