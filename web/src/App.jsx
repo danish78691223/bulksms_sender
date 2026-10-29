@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, ArrowDownToLine, CheckCircle2, ContactRound, FileText, LayoutDashboard, MessageSquareText, Plus, RefreshCw, Send, Settings, ShieldCheck, Users } from 'lucide-react';
 
-const API = (import.meta.env.VITE_API_URL || 'https://bulksms-sender.onrender.com').replace(/\\/$/, '');
+const API = (import.meta.env.VITE_API_URL || 'https://bulksms-sender.onrender.com').trim().replace(/\\/+$/, '').replace(/\\/api$/i, '');
 const getToken = () => localStorage.getItem('sms_token') || '';
 const api = async (path, options = {}) => {
   const response = await fetch(`${API}${path}`, {
