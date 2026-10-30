@@ -8,14 +8,11 @@ import contactRoutes from './routes/contacts.js';
 import campaignRoutes from './routes/campaigns.js';
 import integrationRoutes from './routes/integrations.js';
 import webhookRoutes from './routes/webhooks.js';
+import smsTestRoutes from './routes/smsTest.js';
 
 const app = express();
 app.disable('x-powered-by');
-// Render runs behind a trusted reverse proxy; enable proxy-aware client IP handling for rate limiting.
 app.set('trust proxy', 1);
-
-// Keep the deployed frontend allowed even if CORS_ORIGIN has not yet been
-// updated in Render. CORS_ORIGIN can contain comma-separated extra domains.
 const allowedOrigins = [
   'https://bulksms-sender-phi.vercel.app',
   'http://localhost:5173',
@@ -23,7 +20,6 @@ const allowedOrigins = [
 ];
 const corsOptions = {
   origin(origin, callback) {
-    // Requests without an Origin header (health checks/server-to-server) are allowed.
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error(`CORS origin not allowed: ${origin}`));
   },
@@ -41,6 +37,7 @@ app.use('/api/contacts', contactRoutes);
 app.use('/api/campaigns', campaignRoutes);
 app.use('/api/integrations', integrationRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/sms-test', smsTestRoutes);
 app.use((err, _req, res, _next) => {
   console.error(err?.message || 'Unexpected error');
   res.status(err.status || 500).json({ error: err.status ? err.message : 'Internal server error' });
